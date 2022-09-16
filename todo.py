@@ -4,8 +4,11 @@ Sample todo
     "id": "",
     "name": "",
     "description": "",
+    "status": "TODO",
     "comments": [],
-    "status": 1,
+    "project": "",
+    "current": false,
+    "archive": false,
 }
 """
 from datetime import datetime
@@ -15,6 +18,7 @@ import sys
 
 
 DEFAULT = "default"
+NOW = datetime.now().strftime("%m/%d/%Y, %H:%M")
 
 TODO = 0
 IN_PROGRESS = 1
@@ -41,7 +45,11 @@ def create_todo(project, name, description=""):
         "status": STATUS[TODO],
         "comments": [],
         "project": project,
+        "current": False,
         "archive": False,
+        "created": NOW,
+        "completed": None,
+        "archived": None,
     }
     todos.append(todo)
     with open("config.json", "w") as outfile:
@@ -52,6 +60,8 @@ def create_todo(project, name, description=""):
 
 def update_name(_id, name):
     todo = todos[_id]
+    if todo["archive"]:
+        raise Exception("Invalid id.")
     todo["name"] = name
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
@@ -60,6 +70,8 @@ def update_name(_id, name):
 
 def update_description(_id, description):
     todo = todos[_id]
+    if todo["archive"]:
+        raise Exception("Invalid id.")
     todo["description"] = description
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
@@ -68,6 +80,8 @@ def update_description(_id, description):
 
 def update_project(_id, project):
     todo = todos[_id]
+    if todo["archive"]:
+        raise Exception("Invalid id.")
     todo["project"] = project
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
@@ -76,8 +90,9 @@ def update_project(_id, project):
 
 def add_comment(_id, comment):
     todo = todos[_id]
-    now = datetime.now().strftime("%m/%d/%Y, %H:%M")
-    todo["comments"].append(f"[{now}] {comment}")
+    if todo["archive"]:
+        raise Exception("Invalid id.")
+    todo["comments"].append(f"[{NOW}] {comment}")
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
@@ -85,23 +100,32 @@ def add_comment(_id, comment):
 
 def update_todo_status(todo, status):
     todo["status"] = status
+    if todo["archive"]:
+        raise Exception("Invalid id.")
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo, print_done=True)
 
 
 def workon_todo(_id):
+    for t in todos:
+        t["current"] = False
     todo = todos[_id]
+    todo["current"] = True
     update_todo_status(todo, STATUS[IN_PROGRESS])
 
 
 def complete_todo(_id):
     todo = todos[_id]
+    todo["current"] = False
+    todo["completed"] = NOW
     update_todo_status(todo, STATUS[DONE])
 
 
 def archive_todo(_id):
-    todos[_id]["archive"] = True
+    todo = todos[_id]
+    todo["archive"] = True
+    todo["archived"] = NOW
     with open("config.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print(f"Archived todo {_id}")
@@ -193,11 +217,12 @@ if __name__ == "__main__":
 
     if command == "ls":
         options = "p:i:s:"
-        long_options = ["project=", "id=", "status=", "show-done"]
+        long_options = ["project=", "id=", "status=", "show-done", "current"]
 
         project = None
         _id = None
         status = None
+        current = False
         print_done = False
         try:
             arguments, values = getopt.getopt(
@@ -213,11 +238,20 @@ if __name__ == "__main__":
                     status = currentValue
                 if currentArgument in ("--show-done"):
                     print_done = True
+                if currentArgument in ("--current"):
+                    current = True
         except getopt.error as err:
             # output error, and return with an error code
             print(str(err))
-        filtered_todos = []
-        if _id is not None:
+        if current:
+            current_present = False
+            for t in todos:
+                if t["current"]:
+                    current_present = True
+                    todos = [t]
+            if not current_present:
+                todos = []
+        elif _id is not None:
             todos = [todos[_id]]
         else:
             if status is not None:
