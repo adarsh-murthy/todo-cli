@@ -30,7 +30,7 @@ STATUS = {
 }
 
 try:
-    with open("config.json", "r") as f:
+    with open("todos.json", "r") as f:
         todos = json.load(f)
 except Exception:
     todos = []
@@ -52,7 +52,7 @@ def create_todo(project, name, description=""):
         "archived": None,
     }
     todos.append(todo)
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
     return todo
@@ -63,7 +63,7 @@ def update_name(_id, name):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["name"] = name
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -73,7 +73,7 @@ def update_description(_id, description):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["description"] = description
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -83,7 +83,7 @@ def update_project(_id, project):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["project"] = project
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -93,7 +93,7 @@ def add_comment(_id, comment):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["comments"].append(f"[{NOW}] {comment}")
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -102,7 +102,7 @@ def update_todo_status(todo, status):
     todo["status"] = status
     if todo["archive"]:
         raise Exception("Invalid id.")
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo, print_done=True)
 
@@ -126,7 +126,7 @@ def archive_todo(_id):
     todo = todos[_id]
     todo["archive"] = True
     todo["archived"] = NOW
-    with open("config.json", "w") as outfile:
+    with open("todos.json", "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print(f"Archived todo {_id}")
 
