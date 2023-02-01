@@ -12,9 +12,9 @@ Sample todo
 }
 """
 from datetime import datetime
-import getopt
 import json
-import sys
+
+import click
 
 
 DEFAULT = "default"
@@ -29,8 +29,10 @@ STATUS = {
     DONE: "DONE"
 }
 
+TODO_FILE_PATH = ".gtd.json"
+
 try:
-    with open("config.json", "r") as f:
+    with open(TODO_FILE_PATH, "r") as f:
         todos = json.load(f)
 except Exception:
     todos = []
@@ -52,7 +54,7 @@ def create_todo(project, name, description=""):
         "archived": None,
     }
     todos.append(todo)
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
     return todo
@@ -63,7 +65,7 @@ def update_name(_id, name):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["name"] = name
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -73,7 +75,7 @@ def update_description(_id, description):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["description"] = description
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -83,7 +85,7 @@ def update_project(_id, project):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["project"] = project
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -93,7 +95,7 @@ def add_comment(_id, comment):
     if todo["archive"]:
         raise Exception("Invalid id.")
     todo["comments"].append(f"[{NOW}] {comment}")
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo)
 
@@ -102,7 +104,7 @@ def update_todo_status(todo, status):
     todo["status"] = status
     if todo["archive"]:
         raise Exception("Invalid id.")
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print_todo(todo, print_done=True)
 
@@ -126,7 +128,7 @@ def archive_todo(_id):
     todo = todos[_id]
     todo["archive"] = True
     todo["archived"] = NOW
-    with open("config.json", "w") as outfile:
+    with open(TODO_FILE_PATH, "w") as outfile:
         json.dump(todos, outfile, indent=4)
     print(f"Archived todo {_id}")
 
@@ -140,134 +142,227 @@ def print_todo(todo, print_done=False):
     print("--------------------------------")
 
 
+def todo_by_id(_id):
+    print_todo(todos[_id])
+
+
 def print_all(print_done=False):
     for todo in todos:
         print_todo(todo)
 
 
-if __name__ == "__main__":
-    command = sys.argv[1]
-    argumentList = sys.argv[2:]
+def current_todo():
+    global todos
+    current_present = False
+    for t in todos:
+        if t["current"]:
+            current_present = True
+            print_todo(t)
+    if not current_present:
+        print("There is no todo being worked on.")
 
-    options = "p:n:d:i:c:"
-    long_options = ["project=", "name=", "description=", "id=", "comment="]
 
-    if command == "add":
-        project = DEFAULT
-        description = ""
-        try:
-            arguments, values = getopt.getopt(
-                argumentList, options, long_options
-            )
-            # checking each argument
-            for currentArgument, currentValue in arguments:
-                if currentArgument in ("-p", "--project"):
-                    project = currentValue
-                if currentArgument in ("-n", "--name"):
-                    name = currentValue
-                if currentArgument in ("-d", "--description"):
-                    description = currentValue
-        except getopt.error as err:
-            # output error, and return with an error code
-            print(str(err))
-        create_todo(project, name, description)
+def todos_by_status(status):
+    global todos
+    print_done = False
+    if status == "todo":
+        req = STATUS[TODO]
+    elif status == "inp":
+        req = STATUS[IN_PROGRESS]
+    else:
+        req = STATUS[DONE]
+        print_done = True
+    todos = list(filter(lambda x: x["status"] == req, todos))
+    for t in todos:
+        print_todo(t, print_done)
 
-    if command == "workon":
-        _id = int(sys.argv[2])
-        workon_todo(_id)
 
-    if command == "complete":
-        _id = int(sys.argv[2])
-        complete_todo(_id)
+def todos_by_project(project):
+    global todos
+    todos = list(filter(lambda x: x["project"] == project, todos))
+    for t in todos:
+        print_todo(t)
 
-    if command == "update":
-        _id = int(sys.argv[2])
-        project = None
-        name = None
-        description = None
-        comment = None
-        argumentList = sys.argv[3:]
-        try:
-            arguments, values = getopt.getopt(
-                argumentList, options, long_options
-            )
-            # checking each argument
-            for currentArgument, currentValue in arguments:
-                if currentArgument in ("-p", "--project"):
-                    project = currentValue
-                if currentArgument in ("-i", "--id"):
-                    _id = int(currentValue)
-                if currentArgument in ("-n", "--name"):
-                    name = currentValue
-                if currentArgument in ("-d", "--description"):
-                    description = currentValue
-                if currentArgument in ("-c", "--comment"):
-                    comment = currentValue
-        except getopt.error as err:
-            # output error, and return with an error code
-            print(str(err))
-        if name is not None:
-            update_name(_id, name)
-        if description is not None:
-            update_description(_id, description)
-        if comment is not None:
-            add_comment(_id, comment)
-        if project is not None:
-            update_project(_id, project)
 
-    if command == "ls":
-        options = "p:i:s:"
-        long_options = ["project=", "id=", "status=", "show-done", "current"]
+@click.group()
+def todo():
+    """
+    A Simple CLI tool to manage your todos.
+    """
+    pass
 
-        project = None
-        _id = None
-        status = None
-        current = False
-        print_done = False
-        try:
-            arguments, values = getopt.getopt(
-                argumentList, options, long_options
-            )
-            # checking each argument
-            for currentArgument, currentValue in arguments:
-                if currentArgument in ("-p", "--project"):
-                    project = currentValue
-                if currentArgument in ("-i", "--id"):
-                    _id = int(currentValue)
-                if currentArgument in ("-s", "--status"):
-                    status = currentValue
-                if currentArgument in ("--show-done"):
-                    print_done = True
-                if currentArgument in ("--current"):
-                    current = True
-        except getopt.error as err:
-            # output error, and return with an error code
-            print(str(err))
-        if current:
-            current_present = False
-            for t in todos:
-                if t["current"]:
-                    current_present = True
-                    todos = [t]
-            if not current_present:
-                todos = []
-        elif _id is not None:
-            todos = [todos[_id]]
-        else:
-            if status is not None:
-                if status == "todo":
-                    req = STATUS[TODO]
-                elif status == "inp":
-                    req = STATUS[IN_PROGRESS]
-                else:
-                    req = STATUS[DONE]
-                    print_done = True
-                todos = list(filter(lambda x: x["status"] == req, todos))
-            if project is not None:
-                todos = list(filter(lambda x: x["project"] == project, todos))
-        for t in todos:
-            print_todo(t, print_done=print_done)
 
-    if command == "archive":
-        _id = int(sys.argv[2])
-        archive_todo(_id)
+@click.command()
+@click.option(
+    "-n", "--name",
+    required=True,
+    type=str,
+    help="Short description of todo",
+)
+@click.option(
+    "-d", "--description",
+    required=False,
+    type=str,
+    help="Detailed description of todo",
+)
+@click.option(
+    "-p", "--project",
+    required=False,
+    default=DEFAULT,
+    type=str,
+    help="Name of project the todo belongs to",
+)
+def add(name, description, project):
+    """Add a new todo.
+
+    Eg. python todo.py add -n "buy milk" -p "chores"
+    """
+    create_todo(project, name, description)
+
+
+@click.command()
+@click.argument('id', type=int, nargs=1)
+def workon(id):
+    """Start or continue working on a specific todo.
+
+    Eg. python todo.py workon 23
+    """
+    workon_todo(id)
+
+
+@click.command()
+@click.argument('id', type=int, nargs=1)
+def archive(id):
+    """
+    Archive a todo.
+
+    Eg. python todo.py archive 23
+    """
+    archive_todo
+
+
+@click.command()
+@click.argument('id', type=int, nargs=1)
+def complete(id):
+    """Complete a todo.
+
+    Eg. python todo.py complete 23
+    """
+    complete_todo(id)
+
+
+@click.command()
+@click.argument('id', type=int, nargs=1)
+@click.option(
+    "-n", "--name",
+    required=False,
+    default=None,
+    type=str,
+    help="Short description of todo",
+)
+@click.option(
+    "-d", "--description",
+    required=False,
+    default=None,
+    type=str,
+    help="Detailed description of todo",
+)
+@click.option(
+    "-p", "--project",
+    required=False,
+    default=None,
+    type=str,
+    help="Name of project the todo belongs to",
+)
+def update(id, name, description, project):
+    """Update the details of a given todo.
+
+    Eg. python todo.py update 23 -d "New description."
+    """
+    if name is not None:
+        update_name(id, name)
+    if description is not None:
+        update_description(id, description)
+    if project is not None:
+        update_project(id, project)
+
+
+@click.command()
+@click.argument("id", type=int, nargs=1)
+@click.argument("comment", type=str, nargs=1)
+def comment(id, comment):
+    """Comment on a todo.
+
+    Eg. python todo.py comment 23 "My comment."
+    """
+    add_comment(id, comment)
+
+
+@click.command()
+def current():
+    """Show current todo.
+
+    Eg. python todo.py current
+    """
+    current_todo()
+
+
+@click.command()
+@click.option(
+    "-id",
+    required=False,
+    default=None,
+    type=int,
+    help="Filter by ID of the todo.",
+)
+@click.option(
+    "-s", "--status",
+    required=False,
+    default=None,
+    type=click.Choice(["todo", "inp", "done"], case_sensitive=True),
+    help="Filter by status of todo."
+)
+@click.option(
+    "-p", "--project",
+    required=False,
+    default=None,
+    type=str,
+    help="Filter by name of project the todo belongs to",
+)
+def show(id, status, project):
+    """List todos.
+
+    List all
+        python todo.py list
+
+    List by id
+        python todo.py list -id 23
+
+    List by status
+        python todo.py list -s todo
+
+    List by project
+        python todo.py list -p "project"
+    """
+    if id is not None:
+        todo_by_id(id)
+    elif status is not None:
+        todos_by_status(status)
+    elif project is not None:
+        todos_by_project(project)
+    else:
+        print_all()
+
+
+todo.add_command(add)
+todo.add_command(workon)
+todo.add_command(complete)
+todo.add_command(update)
+todo.add_command(comment)
+todo.add_command(current)
+todo.add_command(show)
+todo.add_command(archive)
+
+
+if __name__ == '__main__':
+    todo()
